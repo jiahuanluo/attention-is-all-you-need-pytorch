@@ -170,7 +170,7 @@ class Transformer(nn.Module):
     def forward(self, src_seq, trg_seq):
 
         src_mask = get_pad_mask(src_seq, self.src_pad_idx)
-        trg_mask = get_pad_mask(trg_seq, self.trg_pad_idx) & get_subsequent_mask(trg_seq)
+        trg_mask = get_pad_mask(trg_seq, self.trg_pad_idx) & get_subsequent_mask(trg_seq).bool()
 
         enc_output, *_ = self.encoder(src_seq, src_mask)
         dec_output, *_ = self.decoder(trg_seq, trg_mask, enc_output, src_mask)

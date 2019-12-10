@@ -11,6 +11,7 @@ from tqdm import tqdm
 import torch
 import torch.nn.functional as F
 import torch.optim as optim
+from torch.utils.data import DataLoader
 from torchtext.data import Field, Dataset, BucketIterator
 from torchtext.datasets import TranslationDataset
 
@@ -18,7 +19,10 @@ import transformer.Constants as Constants
 from transformer.Models import Transformer
 from transformer.Optim import ScheduledOptim
 
+import utils
+
 __author__ = "Yu-Hsiang Huang"
+
 
 def cal_performance(pred, gold, trg_pad_idx, smoothing=False):
     ''' Apply label smoothing if needed '''
@@ -70,14 +74,13 @@ def train_epoch(model, training_data, optimizer, opt, device, smoothing):
     ''' Epoch operation in training phase'''
 
     model.train()
-    total_loss, n_word_total, n_word_correct = 0, 0, 0 
+    total_loss, n_word_total, n_word_correct = 0, 0, 0
 
     desc = '  - (Training)   '
     for batch in tqdm(training_data, mininterval=2, desc=desc, leave=False):
-
         # prepare data
-        src_seq = patch_src(batch.src, opt.src_pad_idx).to(device)
-        trg_seq, gold = map(lambda x: x.to(device), patch_trg(batch.trg, opt.trg_pad_idx))
+        src_seq = patch_src(batch[0], opt.src_pad_idx).to(device)
+        trg_seq, gold = map(lambda x: x.to(device), patch_trg(batch[1], opt.trg_pad_idx))
 
         # forward
         optimizer.zero_grad()
@@ -85,7 +88,7 @@ def train_epoch(model, training_data, optimizer, opt, device, smoothing):
 
         # backward and update parameters
         loss, n_correct, n_word = cal_performance(
-            pred, gold, opt.trg_pad_idx, smoothing=smoothing) 
+            pred, gold, opt.trg_pad_idx, smoothing=smoothing)
         loss.backward()
         optimizer.step_and_update_lr()
 
@@ -94,8 +97,8 @@ def train_epoch(model, training_data, optimizer, opt, device, smoothing):
         n_word_correct += n_correct
         total_loss += loss.item()
 
-    loss_per_word = total_loss/n_word_total
-    accuracy = n_word_correct/n_word_total
+    loss_per_word = total_loss / n_word_total
+    accuracy = n_word_correct / n_word_total
     return loss_per_word, accuracy
 
 
@@ -108,10 +111,9 @@ def eval_epoch(model, validation_data, device, opt):
     desc = '  - (Validation) '
     with torch.no_grad():
         for batch in tqdm(validation_data, mininterval=2, desc=desc, leave=False):
-
             # prepare data
-            src_seq = patch_src(batch.src, opt.src_pad_idx).to(device)
-            trg_seq, gold = map(lambda x: x.to(device), patch_trg(batch.trg, opt.trg_pad_idx))
+            src_seq = patch_src(batch[0], opt.src_pad_idx).to(device)
+            trg_seq, gold = map(lambda x: x.to(device), patch_trg(batch[1], opt.trg_pad_idx))
 
             # forward
             pred = model(src_seq, trg_seq)
@@ -123,8 +125,8 @@ def eval_epoch(model, validation_data, device, opt):
             n_word_correct += n_correct
             total_loss += loss.item()
 
-    loss_per_word = total_loss/n_word_total
-    accuracy = n_word_correct/n_word_total
+    loss_per_word = total_loss / n_word_total
+    accuracy = n_word_correct / n_word_total
     return loss_per_word, accuracy
 
 
@@ -145,12 +147,12 @@ def train(model, training_data, validation_data, optimizer, device, opt):
             log_vf.write('epoch,loss,ppl,accuracy\n')
 
     def print_performances(header, loss, accu, start_time):
-        print('  - {header:12} ppl: {ppl: 8.5f}, accuracy: {accu:3.3f} %, '\
+        print('  - {header:12} ppl: {ppl: 8.5f}, accuracy: {accu:3.3f} %, ' \
               'elapse: {elapse:3.3f} min'.format(
-                  header=f"({header})", ppl=math.exp(min(loss, 100)),
-                  accu=100*accu, elapse=(time.time()-start_time)/60))
+            header=f"({header})", ppl=math.exp(min(loss, 100)),
+            accu=100 * accu, elapse=(time.time() - start_time) / 60))
 
-    #valid_accus = []
+    # valid_accus = []
     valid_losses = []
     for epoch_i in range(opt.epoch):
         print('[ Epoch', epoch_i, ']')
@@ -170,7 +172,7 @@ def train(model, training_data, validation_data, optimizer, device, opt):
 
         if opt.save_model:
             if opt.save_mode == 'all':
-                model_name = opt.save_model + '_accu_{accu:3.3f}.chkpt'.format(accu=100*valid_accu)
+                model_name = opt.save_model + '_accu_{accu:3.3f}.chkpt'.format(accu=100 * valid_accu)
                 torch.save(checkpoint, model_name)
             elif opt.save_mode == 'best':
                 model_name = opt.save_model + '.chkpt'
@@ -182,10 +184,11 @@ def train(model, training_data, validation_data, optimizer, device, opt):
             with open(log_train_file, 'a') as log_tf, open(log_valid_file, 'a') as log_vf:
                 log_tf.write('{epoch},{loss: 8.5f},{ppl: 8.5f},{accu:3.3f}\n'.format(
                     epoch=epoch_i, loss=train_loss,
-                    ppl=math.exp(min(train_loss, 100)), accu=100*train_accu))
+                    ppl=math.exp(min(train_loss, 100)), accu=100 * train_accu))
                 log_vf.write('{epoch},{loss: 8.5f},{ppl: 8.5f},{accu:3.3f}\n'.format(
                     epoch=epoch_i, loss=valid_loss,
-                    ppl=math.exp(min(valid_loss, 100)), accu=100*valid_accu))
+                    ppl=math.exp(min(valid_loss, 100)), accu=100 * valid_accu))
+
 
 def main():
     ''' 
@@ -195,10 +198,10 @@ def main():
 
     parser = argparse.ArgumentParser()
 
-    parser.add_argument('-data_pkl', default=None)     # all-in-1 data pickle or bpe field
+    parser.add_argument('-data_pkl', default=None)  # all-in-1 data pickle or bpe field
 
-    parser.add_argument('-train_path', default=None)   # bpe encoded data
-    parser.add_argument('-val_path', default=None)     # bpe encoded data
+    parser.add_argument('-train_path', default=None)  # bpe encoded data
+    parser.add_argument('-val_path', default=None)  # bpe encoded data
 
     parser.add_argument('-epoch', type=int, default=10)
     parser.add_argument('-b', '--batch_size', type=int, default=2048)
@@ -210,7 +213,7 @@ def main():
 
     parser.add_argument('-n_head', type=int, default=8)
     parser.add_argument('-n_layers', type=int, default=6)
-    parser.add_argument('-warmup','--n_warmup_steps', type=int, default=4000)
+    parser.add_argument('-warmup', '--n_warmup_steps', type=int, default=4000)
 
     parser.add_argument('-dropout', type=float, default=0.1)
     parser.add_argument('-embs_share_weight', action='store_true')
@@ -232,19 +235,20 @@ def main():
         raise
 
     if opt.batch_size < 2048 and opt.n_warmup_steps <= 4000:
-        print('[Warning] The warmup steps may be not enough.\n'\
-              '(sz_b, warmup) = (2048, 4000) is the official setting.\n'\
-              'Using smaller batch w/o longer warmup may cause '\
+        print('[Warning] The warmup steps may be not enough.\n' \
+              '(sz_b, warmup) = (2048, 4000) is the official setting.\n' \
+              'Using smaller batch w/o longer warmup may cause ' \
               'the warmup stage ends with only little data trained.')
 
     device = torch.device('cuda' if opt.cuda else 'cpu')
 
-    #========= Loading Dataset =========#
+    # ========= Loading Dataset =========#
 
     if all((opt.train_path, opt.val_path)):
         training_data, validation_data = prepare_dataloaders_from_bpe_files(opt, device)
     elif opt.data_pkl:
-        training_data, validation_data = prepare_dataloaders(opt, device)
+        # training_data, validation_data = prepare_dataloaders(opt, device)
+        training_data, validation_data = prepare_mydataloaders(opt, device)
     else:
         raise
 
@@ -289,12 +293,12 @@ def prepare_dataloaders_from_bpe_files(opt, device):
 
     train = TranslationDataset(
         fields=fields,
-        path=opt.train_path, 
+        path=opt.train_path,
         exts=('.src', '.trg'),
         filter_pred=filter_examples_with_length)
     val = TranslationDataset(
         fields=fields,
-        path=opt.val_path, 
+        path=opt.val_path,
         exts=('.src', '.trg'),
         filter_pred=filter_examples_with_length)
 
@@ -318,12 +322,12 @@ def prepare_dataloaders(opt, device):
     opt.src_vocab_size = len(data['vocab']['src'].vocab)
     opt.trg_vocab_size = len(data['vocab']['trg'].vocab)
 
-    #========= Preparing Model =========#
+    # ========= Preparing Model =========#
     if opt.embs_share_weight:
         assert data['vocab']['src'].vocab.stoi == data['vocab']['trg'].vocab.stoi, \
             'To sharing word embedding the src/trg word2idx table shall be the same.'
 
-    fields = {'src': data['vocab']['src'], 'trg':data['vocab']['trg']}
+    fields = {'src': data['vocab']['src'], 'trg': data['vocab']['trg']}
 
     train = Dataset(examples=data['train'], fields=fields)
     val = Dataset(examples=data['valid'], fields=fields)
@@ -332,6 +336,42 @@ def prepare_dataloaders(opt, device):
     val_iterator = BucketIterator(val, batch_size=batch_size, device=device)
 
     return train_iterator, val_iterator
+
+
+def prepare_mydataloaders(opt, device):
+    batch_size = opt.batch_size
+    data = pickle.load(open(opt.data_pkl, 'rb'))
+
+    opt.max_token_seq_len = 100
+    opt.src_pad_idx = data['dict']['src'].labelToIdx[Constants.PAD_WORD]
+    opt.trg_pad_idx = data['dict']['tgt'].labelToIdx[Constants.PAD_WORD]
+
+    opt.src_vocab_size = len(data['dict']['src'].labelToIdx)
+    opt.trg_vocab_size = len(data['dict']['tgt'].labelToIdx)
+
+    # ========= Preparing Model =========#
+    if opt.embs_share_weight:
+        assert data['dict']['src'].labelToIdx == data['dict']['tgt'].labelToIdx, \
+            'To sharing word embedding the src/trg word2idx table shall be the same.'
+
+    trainset = utils.BiDataset(data['train'])
+    validset = utils.BiDataset(data['valid'])
+    testset = utils.BiDataset(data['test'])
+    trainloader = DataLoader(dataset=trainset,
+                             batch_size=batch_size,
+                             shuffle=False,
+                             num_workers=0,
+                             collate_fn=utils.padding)
+    validloader = torch.utils.data.DataLoader(dataset=validset,
+                                              batch_size=batch_size,
+                                              shuffle=False,
+                                              num_workers=0,
+                                              collate_fn=utils.padding)
+    testloader = torch.utils.data.DataLoader(dataset=testset,
+                                             batch_size=batch_size,
+                                             shuffle=False,
+                                             collate_fn=utils.padding)
+    return trainloader, validloader
 
 
 if __name__ == '__main__':
