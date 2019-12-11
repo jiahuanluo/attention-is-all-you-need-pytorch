@@ -342,7 +342,7 @@ def prepare_mydataloaders(opt, device):
     batch_size = opt.batch_size
     data = pickle.load(open(opt.data_pkl, 'rb'))
 
-    opt.max_token_seq_len = 100
+    opt.max_token_seq_len = 140
     opt.src_pad_idx = data['dict']['src'].labelToIdx[Constants.PAD_WORD]
     opt.trg_pad_idx = data['dict']['tgt'].labelToIdx[Constants.PAD_WORD]
 
