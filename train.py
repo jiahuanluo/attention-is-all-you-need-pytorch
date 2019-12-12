@@ -77,7 +77,7 @@ def train_epoch(model, training_data, optimizer, opt, device, smoothing):
     total_loss, n_word_total, n_word_correct = 0, 0, 0
 
     desc = '  - (Training)   '
-    for batch in tqdm(training_data, mininterval=2, desc=desc, leave=False):
+    for batch_i, batch in enumerate(tqdm(training_data, mininterval=2, desc=desc, leave=False)):
         # prepare data
         src_seq = patch_src(batch[0], opt.src_pad_idx).to(device)
         trg_seq, gold = map(lambda x: x.to(device), patch_trg(batch[1], opt.trg_pad_idx))
@@ -93,6 +93,8 @@ def train_epoch(model, training_data, optimizer, opt, device, smoothing):
         optimizer.step_and_update_lr()
 
         # note keeping
+        if not batch_i % opt.plot_intval:
+            print(batch_i, round(n_correct / n_word, 4), round(loss.item(), 4))
         n_word_total += n_word
         n_word_correct += n_correct
         total_loss += loss.item()
@@ -136,13 +138,14 @@ def train(model, training_data, validation_data, optimizer, device, opt):
     log_train_file, log_valid_file = None, None
 
     if opt.log:
-        log_train_file = opt.log + '.train.log'
-        log_valid_file = opt.log + '.valid.log'
+        log_train_file = opt.log + '/train.log'
+        log_valid_file = opt.log + '/valid.log'
 
         print('[Info] Training performance will be written to file: {} and {}'.format(
             log_train_file, log_valid_file))
 
         with open(log_train_file, 'w') as log_tf, open(log_valid_file, 'w') as log_vf:
+            log_tf.write(str(opt) + '\n')
             log_tf.write('epoch,loss,ppl,accuracy\n')
             log_vf.write('epoch,loss,ppl,accuracy\n')
 
@@ -172,10 +175,10 @@ def train(model, training_data, validation_data, optimizer, device, opt):
 
         if opt.save_model:
             if opt.save_mode == 'all':
-                model_name = opt.save_model + '_accu_{accu:3.3f}.chkpt'.format(accu=100 * valid_accu)
+                model_name = opt.save_model + '/accu_{accu:3.3f}.chkpt'.format(accu=100 * valid_accu)
                 torch.save(checkpoint, model_name)
             elif opt.save_mode == 'best':
-                model_name = opt.save_model + '.chkpt'
+                model_name = opt.save_model + '/best.chkpt'
                 if valid_loss <= min(valid_losses):
                     torch.save(checkpoint, model_name)
                     print('    - [Info] The checkpoint file has been updated.')
@@ -214,6 +217,7 @@ def main():
     parser.add_argument('-n_head', type=int, default=8)
     parser.add_argument('-n_layers', type=int, default=6)
     parser.add_argument('-warmup', '--n_warmup_steps', type=int, default=4000)
+    parser.add_argument('-lr', '--learning_rate', type=float, default=2.0)
 
     parser.add_argument('-dropout', type=float, default=0.1)
     parser.add_argument('-embs_share_weight', action='store_true')
@@ -233,7 +237,7 @@ def main():
     if not opt.log and not opt.save_model:
         print('No experiment result will be saved.')
         raise
-
+    opt.plot_intval = 256 / opt.batch_size * 500
     if opt.batch_size < 2048 and opt.n_warmup_steps <= 4000:
         print('[Warning] The warmup steps may be not enough.\n' \
               '(sz_b, warmup) = (2048, 4000) is the official setting.\n' \
@@ -272,7 +276,7 @@ def main():
 
     optimizer = ScheduledOptim(
         optim.Adam(transformer.parameters(), betas=(0.9, 0.98), eps=1e-09),
-        2.0, opt.d_model, opt.n_warmup_steps)
+        opt.learning_rate, opt.d_model, opt.n_warmup_steps)
 
     train(transformer, training_data, validation_data, optimizer, device, opt)
 
@@ -359,7 +363,7 @@ def prepare_mydataloaders(opt, device):
     testset = utils.BiDataset(data['test'])
     trainloader = DataLoader(dataset=trainset,
                              batch_size=batch_size,
-                             shuffle=False,
+                             shuffle=True,
                              num_workers=0,
                              collate_fn=utils.padding)
     validloader = torch.utils.data.DataLoader(dataset=validset,
