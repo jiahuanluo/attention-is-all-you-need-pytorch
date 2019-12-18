@@ -114,12 +114,12 @@ def main():
         trg_bos_idx=opt.trg_bos_idx,
         trg_eos_idx=opt.trg_eos_idx).to(device)
 
-    with open(opt.output, 'w', encoding='utf-8') as f:
+    with open(opt.output, 'w+', encoding='utf-8') as f:
         for example in tqdm(test_loader, mininterval=2, desc='  - (Test)', leave=False):
             sec_seq = example[0].view(1, -1)
             pred_seq = translator.translate_sentence(sec_seq.to(device))
             pred_line = ' '.join(TRG.idxToLabel[idx] for idx in pred_seq)
-            pred_line = pred_line.replace(Constants.BOS_WORD, '').replace(Constants.EOS_WORD, '')
+            pred_line = pred_line.replace(Constants.BOS_WORD, '').replace(Constants.EOS_WORD, '\n')
             f.write(pred_line)
 
     print('[Info] Finished.')
