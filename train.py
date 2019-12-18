@@ -344,13 +344,14 @@ def prepare_dataloaders(opt, device):
 
 def prepare_mydataloaders(opt, device):
     batch_size = opt.batch_size
-    data = pickle.load(open(opt.data_pkl, 'rb'))
+    # data = pickle.load(open(opt.data_pkl, 'rb'))
+    data = torch.load(opt.data_pkl, 'rb')
 
     opt.max_token_seq_len = 140
-    opt.src_pad_idx = data['dict']['src'].labelToIdx[Constants.PAD_WORD]
-    opt.trg_pad_idx = data['dict']['tgt'].labelToIdx[Constants.PAD_WORD]
+    opt.src_pad_idx = 0
+    opt.trg_pad_idx = 0
 
-    opt.src_vocab_size = len(data['dict']['src'].labelToIdx)
+    opt.src_vocab_size = 30722
     opt.trg_vocab_size = len(data['dict']['tgt'].labelToIdx)
 
     # ========= Preparing Model =========#

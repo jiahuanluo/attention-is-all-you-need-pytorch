@@ -145,13 +145,13 @@ class Transformer(nn.Module):
 
         self.src_pad_idx, self.trg_pad_idx = src_pad_idx, trg_pad_idx
 
-        self.encoder = Encoder(
-            n_src_vocab=n_src_vocab, n_position=n_position,
-            d_word_vec=d_word_vec, d_model=d_model, d_inner=d_inner,
-            n_layers=n_layers, n_head=n_head, d_k=d_k, d_v=d_v,
-            pad_idx=src_pad_idx, dropout=dropout)
+        # self.encoder = Encoder(
+        #     n_src_vocab=n_src_vocab, n_position=n_position,
+        #     d_word_vec=d_word_vec, d_model=d_model, d_inner=d_inner,
+        #     n_layers=n_layers, n_head=n_head, d_k=d_k, d_v=d_v,
+        #     pad_idx=src_pad_idx, dropout=dropout)
 
-        # self.encoder = BertEncoder()
+        self.encoder = BertEncoder()
 
         self.decoder = Decoder(
             n_trg_vocab=n_trg_vocab, n_position=n_position,
@@ -184,7 +184,7 @@ class Transformer(nn.Module):
         src_mask = get_pad_mask(src_seq, self.src_pad_idx)
         trg_mask = get_pad_mask(trg_seq, self.trg_pad_idx) & get_subsequent_mask(trg_seq).bool()
 
-        enc_output, *_ = self.encoder(src_seq, src_mask)  # (batch_size, seq_len, hidden_size)
+        enc_output, *_ = self.encoder(src_seq)  # (batch_size, seq_len, hidden_size)
         dec_output, *_ = self.decoder(trg_seq, trg_mask, enc_output, src_mask)
         seq_logit = self.trg_word_prj(dec_output) * self.x_logit_scale
 
