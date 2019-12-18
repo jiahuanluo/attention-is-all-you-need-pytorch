@@ -3,7 +3,7 @@ import torch
 import torch.nn as nn
 import numpy as np
 from transformer.Layers import EncoderLayer, DecoderLayer
-
+from transformers import BertModel
 
 __author__ = "Yu-Hsiang Huang"
 
@@ -47,6 +47,16 @@ class PositionalEncoding(nn.Module):
 
     def forward(self, x):
         return x + self.pos_table[:, :x.size(1)].clone().detach()
+
+
+class BertEncoder(nn.Module):
+    def __init__(self):
+        super().__init__()
+        self.model = BertModel.from_pretrained("./pretrain_model/bert-base-uncased")
+
+    def forward(self, x, attention_mask=None, token_type_ids=None):
+        outputs = self.model(x, attention_mask=attention_mask, token_type_ids=token_type_ids)
+        return outputs
 
 
 class Encoder(nn.Module):
@@ -135,11 +145,13 @@ class Transformer(nn.Module):
 
         self.src_pad_idx, self.trg_pad_idx = src_pad_idx, trg_pad_idx
 
-        self.encoder = Encoder(
-            n_src_vocab=n_src_vocab, n_position=n_position,
-            d_word_vec=d_word_vec, d_model=d_model, d_inner=d_inner,
-            n_layers=n_layers, n_head=n_head, d_k=d_k, d_v=d_v,
-            pad_idx=src_pad_idx, dropout=dropout)
+        # self.encoder = Encoder(
+        #     n_src_vocab=n_src_vocab, n_position=n_position,
+        #     d_word_vec=d_word_vec, d_model=d_model, d_inner=d_inner,
+        #     n_layers=n_layers, n_head=n_head, d_k=d_k, d_v=d_v,
+        #     pad_idx=src_pad_idx, dropout=dropout)
+
+        self.encoder = BertEncoder()
 
         self.decoder = Decoder(
             n_trg_vocab=n_trg_vocab, n_position=n_position,
@@ -167,12 +179,12 @@ class Transformer(nn.Module):
             self.encoder.src_word_emb.weight = self.decoder.trg_word_emb.weight
 
 
-    def forward(self, src_seq, trg_seq):
+    def forward(self, src_seq, trg_seq):  # src_seq(batch_size, seq_len), trg_seq(batch_size, seq_len)
 
         src_mask = get_pad_mask(src_seq, self.src_pad_idx)
-        trg_mask = get_pad_mask(trg_seq, self.trg_pad_idx) & get_subsequent_mask(trg_seq)
+        trg_mask = get_pad_mask(trg_seq, self.trg_pad_idx) & get_subsequent_mask(trg_seq).bool()
 
-        enc_output, *_ = self.encoder(src_seq, src_mask)
+        enc_output, *_ = self.encoder(src_seq)  # (batch_size, seq_len, hidden_size)
         dec_output, *_ = self.decoder(trg_seq, trg_mask, enc_output, src_mask)
         seq_logit = self.trg_word_prj(dec_output) * self.x_logit_scale
 
