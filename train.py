@@ -225,6 +225,7 @@ def main():
 
     parser.add_argument('-log', default=None)
     parser.add_argument('-save_model', default=None)
+    parser.add_argument('-restore', default=None)
     parser.add_argument('-save_mode', type=str, choices=['all', 'best'], default='best')
 
     parser.add_argument('-no_cuda', action='store_true')
@@ -273,7 +274,10 @@ def main():
         n_layers=opt.n_layers,
         n_head=opt.n_head,
         dropout=opt.dropout).to(device)
-
+    if opt.restore:
+        print("loading checkpoint from {}...".format(opt.restore.split("/")[-1]))
+        checkpoint = torch.load(opt.restore)
+        transformer.load_state_dict(checkpoint['model'])
     optimizer = ScheduledOptim(
         optim.Adam(transformer.parameters(), betas=(0.9, 0.98), eps=1e-09),
         opt.learning_rate, opt.d_model, opt.n_warmup_steps)
