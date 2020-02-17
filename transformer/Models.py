@@ -3,7 +3,7 @@ import torch
 import torch.nn as nn
 import numpy as np
 from transformer.Layers import EncoderLayer, DecoderLayer
-from transformers import BertModel
+# from transformers import BertModel
 
 __author__ = "Yu-Hsiang Huang"
 

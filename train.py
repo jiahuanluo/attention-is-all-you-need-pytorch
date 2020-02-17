@@ -90,7 +90,8 @@ def train_epoch(model, training_data, optimizer, opt, device, smoothing):
         loss, n_correct, n_word = cal_performance(
             pred, gold, opt.trg_pad_idx, smoothing=smoothing)
         loss.backward()
-        optimizer.step_and_update_lr()
+        # optimizer.step_and_update_lr()
+        optimizer.step()
 
         # note keeping
         if not batch_i % opt.plot_intval:
@@ -238,7 +239,7 @@ def main():
     if not opt.log and not opt.save_model:
         print('No experiment result will be saved.')
         raise
-    opt.plot_intval = 256 / opt.batch_size * 500
+    opt.plot_intval = 20
     if opt.batch_size < 2048 and opt.n_warmup_steps <= 4000:
         print('[Warning] The warmup steps may be not enough.\n' \
               '(sz_b, warmup) = (2048, 4000) is the official setting.\n' \
@@ -278,10 +279,10 @@ def main():
         print("loading checkpoint from {}...".format(opt.restore.split("/")[-1]))
         checkpoint = torch.load(opt.restore)
         transformer.load_state_dict(checkpoint['model'])
-    optimizer = ScheduledOptim(
-        optim.Adam(transformer.parameters(), betas=(0.9, 0.98), eps=1e-09),
-        opt.learning_rate, opt.d_model, opt.n_warmup_steps)
-
+    # optimizer = ScheduledOptim(
+    #     optim.Adam(transformer.parameters(), betas=(0.9, 0.98), eps=1e-09),
+    #     opt.learning_rate, opt.d_model, opt.n_warmup_steps)
+    optimizer = optim.Adagrad(transformer.parameters(), lr=0.15, initial_accumulator_value=0.1)
     train(transformer, training_data, validation_data, optimizer, device, opt)
 
 

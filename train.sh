@@ -20,8 +20,8 @@ LOG=${LOG_PATH}"/log.txt"
 exec &> >(tee -a "$LOG")
 echo Logging output to "$LOG"
 set +x
-time CUDA_VISIBLE_DEVICES=${GPU_ID} python train.py \
-    -data_pkl data/lcsts/global_data/data.pkl \
+time CUDA_VISIBLE_DEVICES=${GPU_ID} python3 train.py \
+    -data_pkl data/${DATASET}/global_data/data.pkl \
     -log ${LOG_PATH} \
     -embs_share_weight \
     -proj_share_weight \
@@ -31,4 +31,5 @@ time CUDA_VISIBLE_DEVICES=${GPU_ID} python train.py \
     -b ${BATCH_SIZE} \
     -warmup ${WARMUP} \
     -lr ${LR} \
-    -save_mode all
+    -save_mode all \
+    -no_cuda
