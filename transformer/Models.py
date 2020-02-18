@@ -182,7 +182,11 @@ class Transformer(nn.Module):
     def forward(self, src_seq, trg_seq):  # src_seq(batch_size, seq_len), trg_seq(batch_size, seq_len)
 
         src_mask = get_pad_mask(src_seq, self.src_pad_idx)
-        trg_mask = get_pad_mask(trg_seq, self.trg_pad_idx) & get_subsequent_mask(trg_seq).bool()
+        try:
+            trg_mask = get_pad_mask(trg_seq, self.trg_pad_idx) & get_subsequent_mask(trg_seq).bool()
+        except:
+            trg_mask = get_pad_mask(trg_seq, self.trg_pad_idx) & get_subsequent_mask(trg_seq)
+
 
         enc_output, *_ = self.encoder(src_seq, src_mask)  # (batch_size, seq_len, hidden_size)
         dec_output, *_ = self.decoder(trg_seq, trg_mask, enc_output, src_mask)
