@@ -11,6 +11,7 @@ from tqdm import tqdm
 import torch
 import torch.nn.functional as F
 import torch.optim as optim
+from torch.nn.utils import clip_grad_norm_
 from torch.utils.data import DataLoader
 from torchtext.data import Field, Dataset, BucketIterator
 from torchtext.datasets import TranslationDataset
@@ -90,8 +91,9 @@ def train_epoch(model, training_data, optimizer, opt, device, smoothing):
         loss, n_correct, n_word = cal_performance(
             pred, gold, opt.trg_pad_idx, smoothing=smoothing)
         loss.backward()
-        # optimizer.step_and_update_lr()
-        optimizer.step()
+        clip_grad_norm_(model.parameters(), 2.0)
+        optimizer.step_and_update_lr()
+        # optimizer.step()
 
         # note keeping
         if not batch_i % opt.plot_intval:
@@ -279,10 +281,10 @@ def main():
         print("loading checkpoint from {}...".format(opt.restore.split("/")[-1]))
         checkpoint = torch.load(opt.restore)
         transformer.load_state_dict(checkpoint['model'])
-    # optimizer = ScheduledOptim(
-    #     optim.Adam(transformer.parameters(), betas=(0.9, 0.98), eps=1e-09),
-    #     opt.learning_rate, opt.d_model, opt.n_warmup_steps)
-    optimizer = optim.Adagrad(transformer.parameters(), lr=0.15, initial_accumulator_value=0.1)
+    optimizer = ScheduledOptim(
+        optim.Adam(transformer.parameters(), betas=(0.9, 0.98), eps=1e-09),
+        opt.learning_rate, opt.d_model, opt.n_warmup_steps)
+    # optimizer = optim.Adagrad(transformer.parameters(), lr=0.15, initial_accumulator_value=0.1)
     train(transformer, training_data, validation_data, optimizer, device, opt)
 
 
