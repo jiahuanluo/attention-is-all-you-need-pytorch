@@ -13,14 +13,14 @@ UNK = 1
 BOS = 2
 EOS = 3
 
-PAD_WORD = '<blank>'
-UNK_WORD = '<unk> '
+PAD_WORD = '[PAD]'
+UNK_WORD = '[UNK] '
 BOS_WORD = '<s>'
 EOS_WORD = '</s>'
 
 
 class Dict(object):
-    def __init__(self, data=None, lower=True):
+    def __init__(self, data=None, lower=False):
         self.idxToLabel = {}
         self.labelToIdx = {}
         self.frequencies = {}
